@@ -1,12 +1,49 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<module type="JAVA_MODULE" version="4">
-  <component name="NewModuleRootManager" inherit-compiler-output="true">
-    <exclude-output />
-    <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" />
-    </content>
-    <orderEntry type="inheritedJdk" />
-    <orderEntry type="sourceFolder" forTests="false" />
-  </component>
-</module>
+def update_smartsheet_data(
+    sheet_data, query_data, query_headers, id_column, update_columns, status_column
+):
+    """
+    Update specific columns in Smartsheet data based on query data and handle status updates.
+
+    :param sheet_data: List of dictionaries representing Smartsheet data.
+    :param query_data: List of lists representing query data.
+    :param query_headers: List of headers for the query data.
+    :param id_column: The name of the ID column for matching records.
+    :param update_columns: List of columns to update in the Smartsheet data.
+    :param status_column: The name of the status column to update.
+    :return: The updated Smartsheet data as a list of dictionaries.
+    """
+    # Convert query data to a dictionary for faster lookup
+    query_dict = {row[query_headers.index(id_column)]: row for row in query_data}
+
+    updated_data = []
+    smartsheet_ids = {record[id_column] for record in sheet_data}
+
+    for record in sheet_data:
+        record_id = record.get(id_column)
+        if record_id in query_dict:
+            # Record exists in query data; update specified columns
+            query_row = query_dict[record_id]
+            for column in update_columns:
+                if column in query_headers:
+                    record[column] = query_row[query_headers.index(column)]
+            # Set status to "In Progress"
+            record[status_column] = "In Progress"
+        else:
+            # Record not in query data; set status to "Completed"
+            record[status_column] = "Completed"
+        updated_data.append(record)
+
+    # Add new records from query data not already in Smartsheet data
+    for row in query_data:
+        row_id = row[query_headers.index(id_column)]
+        if row_id not in smartsheet_ids:
+            new_record = {header: "" for header in sheet_data[0].keys()}  # Default empty values
+            new_record[id_column] = row_id
+            for column in update_columns:
+                if column in query_headers:
+                    new_record[column] = row[query_headers.index(column)]
+            # Set status to "In Progress"
+            new_record[status_column] = "In Progress"
+            updated_data.append(new_record)
+
+    return updated_data
