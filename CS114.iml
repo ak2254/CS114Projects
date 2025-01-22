@@ -1,5 +1,6 @@
 import csv
-from prefect import flow, task
+from prefect import flow, task, get_run_logger
+import os
 
 @task
 def fetch_csv_from_network_file(network_path: str) -> list[dict]:
@@ -12,15 +13,47 @@ def fetch_csv_from_network_file(network_path: str) -> list[dict]:
     Returns:
         list[dict]: List of dictionaries representing rows in the CSV file.
     """
+    logger = get_run_logger()
+    logger.info(f"Attempting to fetch file from: {network_path}")
+    
     try:
-        with open(network_path, mode='r', newline='', encoding='utf-8') as file:
+        # Normalize path to handle spaces and special characters
+        normalized_path = os.path.normpath(network_path)
+        
+        with open(normalized_path, mode='r', newline='', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             data = [row for row in reader]  # Convert CSV rows to list of dicts
+        logger.info(f"Successfully read {len(data)} rows from the file.")
         return data
     except FileNotFoundError:
+        logger.error(f"File not found at {network_path}")
         raise ValueError(f"File not found at {network_path}")
     except Exception as e:
+        logger.error(f"Error reading CSV file: {e}")
         raise RuntimeError(f"Error reading CSV file: {e}")
+
+@task
+def transform_data(data: list[dict]) -> list[dict]:
+    """
+    Task to combine service_id and description into a new column and add request_type column.
+    
+    Args:
+        data (list[dict]): List of dictionaries representing rows in the CSV file.
+    
+    Returns:
+        list[dict]: Updated list of dictionaries with the new columns.
+    """
+    logger = get_run_logger()
+    logger.info("Transforming data by adding combined and request_type columns.")
+    
+    for row in data:
+        service_id = row.get("service_id", "").strip()
+        description = row.get("description", "").strip()
+        row["combined"] = f"{service_id} - {description}"  # Combine columns
+        row["request_type"] = "q-m"  # Add request_type column
+    
+    logger.info("Data transformation completed.")
+    return data
 
 @task
 def process_csv_data(data: list[dict]) -> None:
@@ -30,9 +63,10 @@ def process_csv_data(data: list[dict]) -> None:
     Args:
         data (list[dict]): List of dictionaries representing rows in the CSV file.
     """
-    print(f"Number of rows: {len(data)}")
+    logger = get_run_logger()
+    logger.info(f"Number of rows to process: {len(data)}")
     if data:
-        print(f"First row: {data[0]}")  # Print the first row for preview
+        logger.debug(f"First row data: {data[0]}")  # Log the first row for debugging
 
 @flow
 def csv_network_file_flow(network_path: str):
@@ -42,10 +76,16 @@ def csv_network_file_flow(network_path: str):
     Args:
         network_path (str): Path to the network file.
     """
+    logger = get_run_logger()
+    logger.info("Starting the CSV Network File Flow")
+    
     data = fetch_csv_from_network_file(network_path)
-    process_csv_data(data)
+    transformed_data = transform_data(data)
+    process_csv_data(transformed_data)
+    
+    logger.info("CSV Network File Flow completed successfully.")
 
 if __name__ == "__main__":
-    # Replace this with your network file path
-    network_file_path = r"\\network_drive\shared_folder\example_file.csv"
+    # Example: File path with spaces
+    network_file_path = r"\\network_drive\shared folder\example file.csv"
     csv_network_file_flow(network_file_path)
