@@ -1,49 +1,48 @@
-def update_smartsheet_data(
-    sheet_data, query_data, query_headers, id_column, update_columns, status_column
-):
+from prefect import flow, task
+import os
+
+@task
+def fetch_data_from_network_file(network_path: str) -> str:
     """
-    Update specific columns in Smartsheet data based on query data and handle status updates.
-
-    :param sheet_data: List of dictionaries representing Smartsheet data.
-    :param query_data: List of lists representing query data.
-    :param query_headers: List of headers for the query data.
-    :param id_column: The name of the ID column for matching records.
-    :param update_columns: List of columns to update in the Smartsheet data.
-    :param status_column: The name of the status column to update.
-    :return: The updated Smartsheet data as a list of dictionaries.
+    Task to fetch data from a network file.
+    
+    Args:
+        network_path (str): Path to the network file.
+    
+    Returns:
+        str: Contents of the file.
     """
-    # Convert query data to a dictionary for faster lookup
-    query_dict = {row[query_headers.index(id_column)]: row for row in query_data}
+    try:
+        with open(network_path, 'r') as file:
+            data = file.read()
+        return data
+    except FileNotFoundError:
+        raise ValueError(f"File not found at {network_path}")
+    except Exception as e:
+        raise RuntimeError(f"Error reading file: {e}")
 
-    updated_data = []
-    smartsheet_ids = {record[id_column] for record in sheet_data}
+@task
+def process_data(data: str) -> None:
+    """
+    Task to process the data.
+    
+    Args:
+        data (str): Data fetched from the file.
+    """
+    print(f"Processing data: {data[:100]}...")  # Print first 100 characters for preview
 
-    for record in sheet_data:
-        record_id = record.get(id_column)
-        if record_id in query_dict:
-            # Record exists in query data; update specified columns
-            query_row = query_dict[record_id]
-            for column in update_columns:
-                if column in query_headers:
-                    record[column] = query_row[query_headers.index(column)]
-            # Set status to "In Progress"
-            record[status_column] = "In Progress"
-        else:
-            # Record not in query data; set status to "Completed"
-            record[status_column] = "Completed"
-        updated_data.append(record)
+@flow
+def network_file_flow(network_path: str):
+    """
+    Prefect flow to fetch and process data from a network file.
+    
+    Args:
+        network_path (str): Path to the network file.
+    """
+    data = fetch_data_from_network_file(network_path)
+    process_data(data)
 
-    # Add new records from query data not already in Smartsheet data
-    for row in query_data:
-        row_id = row[query_headers.index(id_column)]
-        if row_id not in smartsheet_ids:
-            new_record = {header: "" for header in sheet_data[0].keys()}  # Default empty values
-            new_record[id_column] = row_id
-            for column in update_columns:
-                if column in query_headers:
-                    new_record[column] = row[query_headers.index(column)]
-            # Set status to "In Progress"
-            new_record[status_column] = "In Progress"
-            updated_data.append(new_record)
-
-    return updated_data
+if __name__ == "__main__":
+    # Replace this with your network file path
+    network_file_path = r"\\network_drive\shared_folder\example_file.txt"
+    network_file_flow(network_file_path)
