@@ -1,48 +1,51 @@
+import csv
 from prefect import flow, task
-import os
 
 @task
-def fetch_data_from_network_file(network_path: str) -> str:
+def fetch_csv_from_network_file(network_path: str) -> list[dict]:
     """
-    Task to fetch data from a network file.
+    Task to fetch data from a CSV file on a network path.
     
     Args:
         network_path (str): Path to the network file.
     
     Returns:
-        str: Contents of the file.
+        list[dict]: List of dictionaries representing rows in the CSV file.
     """
     try:
-        with open(network_path, 'r') as file:
-            data = file.read()
+        with open(network_path, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            data = [row for row in reader]  # Convert CSV rows to list of dicts
         return data
     except FileNotFoundError:
         raise ValueError(f"File not found at {network_path}")
     except Exception as e:
-        raise RuntimeError(f"Error reading file: {e}")
+        raise RuntimeError(f"Error reading CSV file: {e}")
 
 @task
-def process_data(data: str) -> None:
+def process_csv_data(data: list[dict]) -> None:
     """
-    Task to process the data.
+    Task to process the CSV data.
     
     Args:
-        data (str): Data fetched from the file.
+        data (list[dict]): List of dictionaries representing rows in the CSV file.
     """
-    print(f"Processing data: {data[:100]}...")  # Print first 100 characters for preview
+    print(f"Number of rows: {len(data)}")
+    if data:
+        print(f"First row: {data[0]}")  # Print the first row for preview
 
 @flow
-def network_file_flow(network_path: str):
+def csv_network_file_flow(network_path: str):
     """
-    Prefect flow to fetch and process data from a network file.
+    Prefect flow to fetch and process data from a CSV file on a network path.
     
     Args:
         network_path (str): Path to the network file.
     """
-    data = fetch_data_from_network_file(network_path)
-    process_data(data)
+    data = fetch_csv_from_network_file(network_path)
+    process_csv_data(data)
 
 if __name__ == "__main__":
     # Replace this with your network file path
-    network_file_path = r"\\network_drive\shared_folder\example_file.txt"
-    network_file_flow(network_file_path)
+    network_file_path = r"\\network_drive\shared_folder\example_file.csv"
+    csv_network_file_flow(network_file_path)
