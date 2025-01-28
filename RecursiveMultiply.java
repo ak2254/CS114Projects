@@ -1,43 +1,51 @@
-import java.util.Scanner;
+import requests
 
-public class RecursiveMultiply {
-    public static void main(String[] args) {
-        Scanner scan = new Scanner(System.in);
-        int x = scan.nextInt();
-        int y = scan.nextInt();
-        long start = System.currentTimeMillis();
-        long z = mult(x,y);
-        long t = System.currentTimeMillis() - start;
-        System.out.println(z);
-        // Use the following if you want to find run time.
-        //System.out.println("Elapsed time = " + t);
-    }
+# Your Monday.com API Key
+API_KEY = "your_monday_api_key"
 
-    public static long mult(int a, int b) {
-        if(a == 0 || b==0) {
-            return 0;
-        }
+# Monday.com API URL
+URL = "https://api.monday.com/v2"
 
-        if(b==1) {
-            return a;
-        }
-        else if(b%2==0) {
-            long k = mult(a,b/2);
-            return k+k;
-
-        }
-        else if(b%2==1){
-
-            long y = mult(a, (b-1)/2);
-
-            return a+y+y;
-
-
-
-        }
-        else {
-            return b;
-
+# GraphQL Query to Get Board Details
+query = """
+{
+    boards {
+        id
+        name
+        items {
+            id
+            name
+            column_values {
+                id
+                title
+                text
+            }
         }
     }
 }
+"""
+
+# Headers
+headers = {
+    "Authorization": API_KEY,
+}
+
+# Send Request
+response = requests.post(
+    URL,
+    headers=headers,
+    json={"query": query},
+)
+
+# Output the Response
+if response.status_code == 200:
+    data = response.json()
+    boards = data.get("data", {}).get("boards", [])
+    for board in boards:
+        print(f"Board ID: {board['id']}, Name: {board['name']}")
+        for item in board["items"]:
+            print(f"  Item ID: {item['id']}, Name: {item['name']}")
+            for column in item["column_values"]:
+                print(f"    Column: {column['title']} - Value: {column['text']}")
+else:
+    print("Failed to fetch board details:", response.text)
