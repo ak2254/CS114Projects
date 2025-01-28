@@ -1,28 +1,27 @@
 import requests
 
-# Your Monday.com API Key
-API_KEY = "your_monday_api_key"
-
-# Monday.com API URL
+# Replace with your API key and board ID
+API_KEY = "your_api_key"
+BOARD_ID = 123456789  # Replace with your board ID
 URL = "https://api.monday.com/v2"
 
-# GraphQL Query to Get Board Details
-query = """
-{
-    boards {
+# GraphQL Query
+query = f"""
+{{
+  boards(ids: {BOARD_ID}) {{
+    id
+    name
+    items {{
+      id
+      name
+      column_values {{
         id
-        name
-        items {
-            id
-            name
-            column_values {
-                id
-                title
-                text
-            }
-        }
-    }
-}
+        title
+        text
+      }}
+    }}
+  }}
+}}
 """
 
 # Headers
@@ -30,22 +29,17 @@ headers = {
     "Authorization": API_KEY,
 }
 
-# Send Request
-response = requests.post(
-    URL,
-    headers=headers,
-    json={"query": query},
-)
+# Make the Request
+response = requests.post(URL, headers=headers, json={"query": query})
 
-# Output the Response
+# Handle Response
 if response.status_code == 200:
     data = response.json()
-    boards = data.get("data", {}).get("boards", [])
-    for board in boards:
-        print(f"Board ID: {board['id']}, Name: {board['name']}")
-        for item in board["items"]:
-            print(f"  Item ID: {item['id']}, Name: {item['name']}")
-            for column in item["column_values"]:
-                print(f"    Column: {column['title']} - Value: {column['text']}")
+    board = data.get("data", {}).get("boards", [])[0]
+    print(f"Board Name: {board['name']}")
+    for item in board["items"]:
+        print(f"  Item Name: {item['name']}")
+        for column in item["column_values"]:
+            print(f"    Column: {column['title']} - Value: {column['text']}")
 else:
-    print("Failed to fetch board details:", response.text)
+    print("Error:", response.status_code, response.text)
